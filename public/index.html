@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>شیشه‌ای ها</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== صفحه ورود ===== -->
+  <div id="login">
+    <h1>شیشه‌ای ها</h1>
+    <p style="color:rgba(255,255,255,0.7);">یوزرنیمت رو با @ وارد کن (مثل @AliHastam12)</p>
+    <input type="text" id="username" placeholder="@YourUsername">
+    <button id="loginBtn">✨ بزن بریم تو دنیای شیشه‌ای</button>
+    <div id="loginError" style="color:#ff6b6b; margin-top:10px; display:none;"></div>
+  </div>
+
+  <!-- ===== صفحه لودینگ ===== -->
+  <div id="loading" style="display:none;">
+    <div class="loading-box">
+      <h2>⏳ داریم شیشه‌هاتو صیقل می‌دیم...</h2>
+      <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <p class="slogan">
+        💎 شعار ما همیشه: <br>
+        <strong>«مصرف بی‌رویه کار خیلی بدیه»</strong>
+      </p>
+    </div>
+  </div>
+
+  <!-- ===== صفحه اصلی ===== -->
+  <div id="app" style="display:none;">
+    <div id="sidebar">
+      <div id="profile">
+        <img id="avatarImg" src="" alt="آواتار">
+        <div>
+          <span id="displayName"></span>
+          <div id="levelBadge">شیشه‌ای 1</div>
+        </div>
+        <input type="file" id="avatarUpload" accept="image/*" style="display:none;">
+        <button onclick="document.getElementById('avatarUpload').click()" class="icon-btn">📸</button>
+      </div>
+      
+      <div id="chatList">
+        <div class="section-title">💬 پی‌وی‌ها</div>
+        <div id="userList"></div>
+        <div class="section-title">👥 گروه‌ها</div>
+        <div id="groupList"></div>
+        <button id="createGroupBtn" class="action-btn">➕ گروه جدید</button>
+      </div>
+    </div>
+    
+    <div id="chatArea">
+      <div id="chatHeader">
+        <span id="chatTitle">انتخاب کنید</span>
+        <span id="groupLinkDisplay" style="font-size:12px; opacity:0.7;"></span>
+      </div>
+      <div id="messages"></div>
+      <div id="inputArea">
+        <input type="text" id="msgInput" placeholder="پیامت رو بنویس...">
+        <button id="sendBtn">📨</button>
+        <input type="file" id="fileInput" accept="image/*" style="display:none;">
+        <button onclick="document.getElementById('fileInput').click()" class="icon-btn">🖼️</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== نوتیف گلاسفوریسم ===== -->
+  <div id="glassNotification" style="display:none;">
+    <span id="notifText"></span>
+  </div>
+
+  <!-- ===== مودال ساخت گروه ===== -->
+  <div id="groupModal" style="display:none;" class="modal">
+    <div class="modal-content">
+      <h3>ساخت گروه جدید</h3>
+      <input type="text" id="groupNameInput" placeholder="اسم گروه">
+      <button id="confirmCreateGroup">ساخت گروه</button>
+      <button onclick="document.getElementById('groupModal').style.display='none'" class="close-btn">بستن</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
