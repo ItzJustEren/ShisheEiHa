@@ -18,7 +18,7 @@ const io = new Server(server, {
   transports: ['websocket']
 });
 
-// ===== JWT MIDDLEWARE FOR SOCKET =====
+// ===== JWT =====
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) return next(new Error('Authentication required'));
@@ -59,6 +59,7 @@ function calcLevel(msgCount) {
 
 const usernameRegex = /^@[a-zA-Z0-9_.]{3,30}$/;
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_change_me';
+const DAILY_API_KEY = process.env.DAILY_API_KEY;
 
 function generateToken(user) {
   return jwt.sign(
@@ -289,6 +290,42 @@ app.post('/api/upload-avatar', verifyToken, upload.single('avatar'), async (req,
 });
 
 // ============================================================
+// ===================== DAILY.CO CALL =========================
+// ============================================================
+
+// API برای ساخت اتاق تماس
+app.post('/api/create-call-room', async (req, res) => {
+  const { groupId } = req.body;
+  if (!groupId) return res.status(400).json({ error: 'Group ID required' });
+  if (!DAILY_API_KEY) return res.status(500).json({ error: 'DAILY_API_KEY not set' });
+
+  try {
+    const response = await fetch('https://api.daily.co/v1/rooms', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DAILY_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: `group-${groupId}-${Date.now()}`,
+        properties: {
+          max_participants: 20,
+          enable_screenshare: true,
+          start_audio_off: false,
+          start_video_off: true,
+          enable_chat: true
+        }
+      })
+    });
+    const data = await response.json();
+    res.json({ roomUrl: data.url, roomName: data.name });
+  } catch (err) {
+    console.error('Daily.co error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
 // ===================== SOCKET.IO =============================
 // ============================================================
 
@@ -334,6 +371,46 @@ io.on('connection', (socket) => {
     socket.join(`group-${groupId}`);
   });
 
+  // ===== GROUP CALL =====
+  socket.on('start-group-call', async ({ groupId }) => {
+    try {
+      if (!DAILY_API_KEY) {
+        socket.emit('error', 'DAILY_API_KEY not configured');
+        return;
+      }
+      const response = await fetch('https://api.daily.co/v1/rooms', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${DAILY_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: `group-${groupId}-${Date.now()}`,
+          properties: {
+            max_participants: 20,
+            enable_screenshare: true,
+            start_audio_off: false,
+            start_video_off: true,
+            enable_chat: true
+          }
+        })
+      });
+      const data = await response.json();
+      
+      io.to(`group-${groupId}`).emit('group-call-started', {
+        roomUrl: data.url,
+        roomName: data.name,
+        startedBy: currentUser
+      });
+    } catch (err) {
+      socket.emit('error', 'Failed to start call: ' + err.message);
+    }
+  });
+
+  socket.on('end-group-call', ({ groupId }) => {
+    io.to(`group-${groupId}`).emit('group-call-ended');
+  });
+
   // ===== SEND MESSAGE =====
   socket.on('send-message', async (data) => {
     const { to, text, type = 'text', fileUrl = null, groupId = null, replyTo = null, forwardedFrom = null } = data;
@@ -374,7 +451,6 @@ io.on('connection', (socket) => {
               message: text,
               messageId: msg.id
             });
-            // ارسال @ به گروه برای نشان‌دادن منشن
             io.to(`group-${groupId}`).emit('mention-badge', { groupId, username });
           }
         }
