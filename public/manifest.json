@@ -8,14 +8,14 @@
   "theme_color": "#0f1a2c",
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='192' height='192'%3E%3Crect width='192' height='192' rx='48' fill='%234facfe'/%3E%3Ctext x='96' y='132' font-family='Arial' font-size='96' font-weight='bold' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/svg+xml"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='512' height='512'%3E%3Crect width='512' height='512' rx='128' fill='%234facfe'/%3E%3Ctext x='256' y='348' font-family='Arial' font-size='256' font-weight='bold' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/svg+xml"
     }
   ]
 }
