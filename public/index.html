@@ -2,11 +2,15 @@
 <html dir="ltr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Shisheiha</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.1/tabler-icons.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0f1a2c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
 
@@ -14,28 +18,28 @@
 <div id="login">
   <div class="login-box">
     <div class="login-header">
-      <i class="ti ti-message-circle-2" style="font-size:48px; color:#4facfe;"></i>
+      <i class="fas fa-comment-dots" style="font-size:48px; color:#4facfe;"></i>
       <h1>Shisheiha</h1>
       <p>Welcome to the glass world</p>
     </div>
     <div id="loginError" class="error-msg" style="display:none;"></div>
     <input type="text" id="username" placeholder="@username (letters, numbers, _, .)" autocomplete="username">
     <input type="password" id="password" placeholder="Password (min 4 chars)" autocomplete="current-password">
-    <button id="loginBtn">Sign In</button>
-    <button id="registerBtn" class="secondary-btn">Create Account</button>
+    <button id="loginBtn"><i class="fas fa-sign-in-alt"></i> Sign In</button>
+    <button id="registerBtn" class="secondary-btn"><i class="fas fa-user-plus"></i> Create Account</button>
   </div>
 </div>
 
 <!-- ===== LOADING ===== -->
 <div id="loading" style="display:none;">
   <div class="loading-box">
-    <i class="ti ti-glass" style="font-size:64px; color:#4facfe; animation: spin 2s linear infinite;"></i>
+    <i class="fas fa-wine-glass" style="font-size:64px; color:#4facfe; animation: spin 2s linear infinite;"></i>
     <h2>Polishing your glass...</h2>
     <div class="progress-container">
       <div class="progress-bar" id="progressBar"></div>
     </div>
     <p class="slogan">
-      💎 Our motto always:<br>
+      <i class="fas fa-gem"></i> Our motto always:<br>
       <strong>«مصرف بی‌رویه کار خیلی بدیه»</strong>
     </p>
   </div>
@@ -43,56 +47,42 @@
 
 <!-- ===== MAIN APP ===== -->
 <div id="app" style="display:none;">
-  <!-- Left Sidebar -->
   <div id="sidebar">
     <div id="profile">
-      <img id="avatarImg" src="" alt="avatar">
+      <img id="avatarImg" src="" alt="avatar" onclick="openProfile(currentUser)">
       <div class="profile-info">
-        <span id="displayName"></span>
-        <div id="levelBadge">Level 1</div>
+        <span id="displayName" onclick="openProfile(currentUser)"></span>
+        <div id="levelBadge"><i class="fas fa-star"></i> Level 1</div>
       </div>
       <div class="profile-actions">
         <input type="file" id="avatarUpload" accept="image/*" style="display:none;">
         <button onclick="document.getElementById('avatarUpload').click()" class="icon-btn" title="Change avatar">
-          <i class="ti ti-camera"></i>
+          <i class="fas fa-camera"></i>
         </button>
         <button id="logoutBtn" class="icon-btn" title="Logout">
-          <i class="ti ti-logout"></i>
+          <i class="fas fa-sign-out-alt"></i>
         </button>
       </div>
     </div>
 
     <div class="search-box">
-      <i class="ti ti-search"></i>
+      <i class="fas fa-search"></i>
       <input type="text" id="searchUser" placeholder="Search users...">
       <div id="searchResults" style="display:none;"></div>
     </div>
 
     <div class="chat-list">
-      <div class="section-header">
-        <i class="ti ti-messages"></i>
-        <span>Chats</span>
-      </div>
+      <div class="section-header"><i class="fas fa-comments"></i> Chats</div>
       <div id="userList"></div>
-      
-      <div class="section-header" style="margin-top:16px;">
-        <i class="ti ti-users"></i>
-        <span>Groups</span>
-      </div>
+      <div class="section-header" style="margin-top:16px;"><i class="fas fa-users"></i> Groups</div>
       <div id="groupList"></div>
-      
       <div class="action-buttons">
-        <button id="createGroupBtn" class="action-btn">
-          <i class="ti ti-plus"></i> New Group
-        </button>
-        <button id="joinGroupBtn" class="action-btn secondary">
-          <i class="ti ti-link"></i> Join Group
-        </button>
+        <button id="createGroupBtn" class="action-btn"><i class="fas fa-plus"></i> New Group</button>
+        <button id="joinGroupBtn" class="action-btn secondary"><i class="fas fa-link"></i> Join Group</button>
       </div>
     </div>
   </div>
 
-  <!-- Chat Area -->
   <div id="chatArea">
     <div id="chatHeader">
       <div>
@@ -101,40 +91,80 @@
       </div>
       <div id="chatActions">
         <button id="groupInfoBtn" style="display:none;" class="icon-btn">
-          <i class="ti ti-info-circle"></i>
+          <i class="fas fa-info-circle"></i>
         </button>
       </div>
     </div>
+
+    <div id="replyBar" style="display:none;">
+      <div class="reply-content">
+        <i class="fas fa-reply"></i>
+        <div>
+          <span id="replySender"></span>
+          <span id="replyText"></span>
+        </div>
+        <button id="cancelReplyBtn"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+
     <div id="messages"></div>
+
     <div id="inputArea">
-      <button id="emojiBtn" class="icon-btn">
-        <i class="ti ti-mood-happy"></i>
-      </button>
-      <input type="text" id="msgInput" placeholder="Type a message...">
-      <button id="fileBtn" class="icon-btn">
-        <i class="ti ti-photo"></i>
-      </button>
+      <button id="fileBtn" class="icon-btn"><i class="fas fa-image"></i></button>
       <input type="file" id="fileInput" accept="image/*" style="display:none;">
-      <button id="sendBtn">
-        <i class="ti ti-send"></i>
-      </button>
+      <input type="text" id="msgInput" placeholder="Type a message...">
+      <button id="sendBtn"><i class="fas fa-paper-plane"></i></button>
     </div>
   </div>
 </div>
 
-<!-- ===== GLASS NOTIFICATION ===== -->
-<div id="glassNotification" style="display:none;">
-  <i id="notifIcon" class="ti ti-info-circle"></i>
-  <span id="notifText"></span>
+<!-- ===== MODALS ===== -->
+<div id="profileModal" style="display:none;" class="modal">
+  <div class="modal-content profile-card">
+    <div class="profile-card-header">
+      <img id="profileAvatar" src="" alt="avatar">
+      <h3 id="profileUsername"></h3>
+      <p id="profileDisplayName"></p>
+      <p id="profileBio"></p>
+      <p id="profileLevel"><i class="fas fa-star"></i> Level <span></span></p>
+      <button class="close-btn" onclick="closeModal('profileModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="profile-card-actions">
+      <button id="editProfileBtn" style="display:none;" class="primary"><i class="fas fa-edit"></i> Edit Profile</button>
+    </div>
+  </div>
 </div>
 
-<!-- ===== MODALS ===== -->
+<div id="editProfileModal" style="display:none;" class="modal">
+  <div class="modal-content">
+    <h3><i class="fas fa-user-edit"></i> Edit Profile</h3>
+    <input type="text" id="editDisplayName" placeholder="Display name">
+    <textarea id="editBio" placeholder="Bio" rows="3"></textarea>
+    <div class="modal-actions">
+      <button id="saveProfileBtn" class="primary"><i class="fas fa-save"></i> Save</button>
+      <button onclick="closeModal('editProfileModal')" class="secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="forwardModal" style="display:none;" class="modal">
+  <div class="modal-content">
+    <h3><i class="fas fa-share"></i> Forward Message</h3>
+    <p style="color:rgba(255,255,255,0.5); font-size:0.85rem; margin-bottom:12px;">Forward to a user or group</p>
+    <input type="text" id="forwardSearch" placeholder="Search user or group...">
+    <div id="forwardResults" style="max-height:200px; overflow-y:auto; margin:8px 0;"></div>
+    <div class="modal-actions">
+      <button onclick="closeModal('forwardModal')" class="secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="groupModal" style="display:none;" class="modal">
   <div class="modal-content">
-    <h3><i class="ti ti-users"></i> New Group</h3>
+    <h3><i class="fas fa-users"></i> New Group</h3>
     <input type="text" id="groupNameInput" placeholder="Group name">
     <div class="modal-actions">
-      <button id="confirmCreateGroup" class="primary">Create</button>
+      <button id="confirmCreateGroup" class="primary"><i class="fas fa-check"></i> Create</button>
       <button onclick="closeModal('groupModal')" class="secondary">Cancel</button>
     </div>
   </div>
@@ -142,13 +172,19 @@
 
 <div id="joinGroupModal" style="display:none;" class="modal">
   <div class="modal-content">
-    <h3><i class="ti ti-link"></i> Join Group</h3>
+    <h3><i class="fas fa-link"></i> Join Group</h3>
     <input type="text" id="groupLinkInput" placeholder="Shisheiha://xxxxxxxxxx">
     <div class="modal-actions">
-      <button id="confirmJoinGroup" class="primary">Join</button>
+      <button id="confirmJoinGroup" class="primary"><i class="fas fa-check"></i> Join</button>
       <button onclick="closeModal('joinGroupModal')" class="secondary">Cancel</button>
     </div>
   </div>
+</div>
+
+<!-- ===== NOTIFICATION ===== -->
+<div id="glassNotification" style="display:none;">
+  <i id="notifIcon" class="fas fa-info-circle"></i>
+  <span id="notifText"></span>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
