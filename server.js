@@ -9,7 +9,9 @@ const cors = require('cors');
 const { nanoid } = require('nanoid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { RtcTokenBuilder, RtcRole } = require('agora-token');
+const Agora = require('agora-access-token');
+const RtcTokenBuilder = Agora.RtcTokenBuilder;
+const RtcRole = Agora.RtcRole;
 
 const app = express();
 const server = http.createServer(app);
