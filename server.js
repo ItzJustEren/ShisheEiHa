@@ -9,6 +9,7 @@ const cors = require('cors');
 const { nanoid } = require('nanoid');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { RtcTokenBuilder, RtcRole } = require('agora-token');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,7 +19,7 @@ const io = new Server(server, {
   transports: ['websocket']
 });
 
-// ===== JWT =====
+// ===== JWT MIDDLEWARE FOR SOCKET =====
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) return next(new Error('Authentication required'));
@@ -59,7 +60,34 @@ function calcLevel(msgCount) {
 
 const usernameRegex = /^@[a-zA-Z0-9_.]{3,30}$/;
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_change_me';
-const DAILY_API_KEY = process.env.DAILY_API_KEY;
+
+// ============================================================
+// ===================== AGORA SETUP ===========================
+// ============================================================
+
+const AGORA_APP_ID = process.env.AGORA_APP_ID;
+const AGORA_APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE || '';
+
+function generateAgoraToken(channelName, uid) {
+  const expirationTimeInSeconds = 3600;
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+  
+  const token = RtcTokenBuilder.buildTokenWithUid(
+    AGORA_APP_ID,
+    AGORA_APP_CERTIFICATE,
+    channelName,
+    uid,
+    RtcRole.PUBLISHER,
+    privilegeExpiredTs
+  );
+  
+  return token;
+}
+
+// ============================================================
+// ===================== AUTH ==================================
+// ============================================================
 
 function generateToken(user) {
   return jwt.sign(
@@ -80,10 +108,6 @@ function verifyToken(req, res, next) {
     res.status(401).json({ error: 'Invalid token' });
   }
 }
-
-// ============================================================
-// ===================== AUTH ==================================
-// ============================================================
 
 app.post('/api/register', async (req, res) => {
   const { username, password, display_name, bio } = req.body;
@@ -290,37 +314,27 @@ app.post('/api/upload-avatar', verifyToken, upload.single('avatar'), async (req,
 });
 
 // ============================================================
-// ===================== DAILY.CO CALL =========================
+// ===================== AGORA CALL ============================
 // ============================================================
 
-// API برای ساخت اتاق تماس
-app.post('/api/create-call-room', async (req, res) => {
+app.post('/api/agora-start-call', async (req, res) => {
   const { groupId } = req.body;
   if (!groupId) return res.status(400).json({ error: 'Group ID required' });
-  if (!DAILY_API_KEY) return res.status(500).json({ error: 'DAILY_API_KEY not set' });
+  if (!AGORA_APP_ID) return res.status(500).json({ error: 'AGORA_APP_ID not set' });
 
   try {
-    const response = await fetch('https://api.daily.co/v1/rooms', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${DAILY_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: `group-${groupId}-${Date.now()}`,
-        properties: {
-          max_participants: 20,
-          enable_screenshare: true,
-          start_audio_off: false,
-          start_video_off: true,
-          enable_chat: true
-        }
-      })
+    const channelName = `group-${groupId}`;
+    const uid = Math.floor(Math.random() * 1000000);
+    const token = generateAgoraToken(channelName, uid);
+    
+    res.json({
+      appId: AGORA_APP_ID,
+      channel: channelName,
+      token: token,
+      uid: uid
     });
-    const data = await response.json();
-    res.json({ roomUrl: data.url, roomName: data.name });
   } catch (err) {
-    console.error('Daily.co error:', err);
+    console.error('Agora error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -374,32 +388,20 @@ io.on('connection', (socket) => {
   // ===== GROUP CALL =====
   socket.on('start-group-call', async ({ groupId }) => {
     try {
-      if (!DAILY_API_KEY) {
-        socket.emit('error', 'DAILY_API_KEY not configured');
+      if (!AGORA_APP_ID) {
+        socket.emit('error', 'AGORA_APP_ID not configured');
         return;
       }
-      const response = await fetch('https://api.daily.co/v1/rooms', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${DAILY_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: `group-${groupId}-${Date.now()}`,
-          properties: {
-            max_participants: 20,
-            enable_screenshare: true,
-            start_audio_off: false,
-            start_video_off: true,
-            enable_chat: true
-          }
-        })
-      });
-      const data = await response.json();
+      
+      const channelName = `group-${groupId}`;
+      const uid = Math.floor(Math.random() * 1000000);
+      const token = generateAgoraToken(channelName, uid);
       
       io.to(`group-${groupId}`).emit('group-call-started', {
-        roomUrl: data.url,
-        roomName: data.name,
+        appId: AGORA_APP_ID,
+        channel: channelName,
+        token: token,
+        uid: uid,
         startedBy: currentUser
       });
     } catch (err) {
@@ -411,7 +413,7 @@ io.on('connection', (socket) => {
     io.to(`group-${groupId}`).emit('group-call-ended');
   });
 
-  // ===== SEND MESSAGE =====
+  // ===== SEND MESSAGE (با ریپلای کامل) =====
   socket.on('send-message', async (data) => {
     const { to, text, type = 'text', fileUrl = null, groupId = null, replyTo = null, forwardedFrom = null } = data;
     if (!currentUser) return;
@@ -424,6 +426,32 @@ io.on('connection', (socket) => {
 
     try {
       let msg;
+      let replyData = null;
+
+      // اگر ریپلای وجود داره، اطلاعات پیام اصلی رو بگیر
+      if (replyTo) {
+        const replyRes = await pool.query(
+          `SELECT m.text, m.sender, u.display_name as sender_display
+           FROM messages m
+           LEFT JOIN users u ON m.sender = u.username
+           WHERE m.id = $1`,
+          [replyTo]
+        );
+        if (replyRes.rows.length > 0) {
+          replyData = {
+            text: replyRes.rows[0].text,
+            sender: replyRes.rows[0].sender,
+            sender_display: replyRes.rows[0].sender_display
+          };
+        } else {
+          replyData = {
+            text: 'Deleted message',
+            sender: null,
+            sender_display: null
+          };
+        }
+      }
+
       if (groupId) {
         const result = await pool.query(
           `INSERT INTO messages (sender, group_id, text, type, file_url, reply_to, forwarded_from, created_at)
@@ -431,7 +459,15 @@ io.on('connection', (socket) => {
           [currentUser, groupId, text, type, fileUrl, replyTo, forwardedFrom]
         );
         msg = result.rows[0];
-        const payload = { ...msg, sender_avatar: sender.avatar, sender_display: sender.display_name };
+        
+        const payload = { 
+          ...msg, 
+          sender_avatar: sender.avatar, 
+          sender_display: sender.display_name,
+          reply_text: replyData?.text || null,
+          reply_sender: replyData?.sender || null,
+          reply_sender_display: replyData?.sender_display || null
+        };
         io.to(`group-${groupId}`).emit('receive-message', payload);
 
         // MENTION DETECTION
@@ -462,7 +498,15 @@ io.on('connection', (socket) => {
           [currentUser, to, text, type, fileUrl, replyTo, forwardedFrom]
         );
         msg = result.rows[0];
-        const payload = { ...msg, sender_avatar: sender.avatar, sender_display: sender.display_name };
+        
+        const payload = { 
+          ...msg, 
+          sender_avatar: sender.avatar, 
+          sender_display: sender.display_name,
+          reply_text: replyData?.text || null,
+          reply_sender: replyData?.sender || null,
+          reply_sender_display: replyData?.sender_display || null
+        };
         io.to(roomName).emit('receive-message', payload);
       } else {
         const result = await pool.query(
@@ -471,7 +515,15 @@ io.on('connection', (socket) => {
           [currentUser, text, type, fileUrl, replyTo, forwardedFrom]
         );
         msg = result.rows[0];
-        const payload = { ...msg, sender_avatar: sender.avatar, sender_display: sender.display_name };
+        
+        const payload = { 
+          ...msg, 
+          sender_avatar: sender.avatar, 
+          sender_display: sender.display_name,
+          reply_text: replyData?.text || null,
+          reply_sender: replyData?.sender || null,
+          reply_sender_display: replyData?.sender_display || null
+        };
         socket.broadcast.emit('receive-message', payload);
         socket.emit('receive-message', payload);
       }
