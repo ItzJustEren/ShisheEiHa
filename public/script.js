@@ -19,10 +19,13 @@ let currentOffset = 0;
 let replyToMessage = null;
 let forwardMessageId = null;
 
-// ===== CALL VARIABLES =====
-let callFrame = null;
-let currentCallRoomUrl = null;
+// ===== CALL VARIABLES (Agora) =====
+let client = null;
+let localAudioTrack = null;
+let localVideoTrack = null;
+let remoteUsers = {};
 let isCallActive = false;
+let currentCallRoomData = null;
 
 // ============================================================
 // ===================== DOM REFS ==============================
@@ -76,12 +79,17 @@ const forwardModal = document.getElementById('forwardModal');
 const forwardSearch = document.getElementById('forwardSearch');
 const forwardResults = document.getElementById('forwardResults');
 
-// ===== CALL BUTTONS =====
+// ===== CALL DOM REFS =====
 const callActions = document.getElementById('callActions');
 const startCallBtn = document.getElementById('startCallBtn');
 const joinCallBtn = document.getElementById('joinCallBtn');
 const endCallBtn = document.getElementById('endCallBtn');
 const callContainer = document.getElementById('callContainer');
+const muteBtn = document.getElementById('muteBtn');
+const videoBtn = document.getElementById('videoBtn');
+const endCallBtnAgora = document.getElementById('endCallBtnAgora');
+const remoteVideoContainer = document.getElementById('remoteVideoContainer');
+const localVideoContainer = document.getElementById('localVideoContainer');
 
 // ============================================================
 // ===================== TOKEN MANAGEMENT ======================
@@ -239,7 +247,7 @@ passwordInput.addEventListener('keydown', e => { if (e.key === 'Enter') auth('lo
 // ============================================================
 
 logoutBtn.onclick = () => {
-  if (isCallActive) endCallUI();
+  if (isCallActive) leaveAgoraCall();
   removeToken();
   localStorage.clear();
   location.reload();
@@ -426,7 +434,7 @@ function addGroupToList(id, name, link) {
 
 function openPV(user) {
   if (user === currentUser) return;
-  if (isCallActive) endCallUI();
+  if (isCallActive) leaveAgoraCall();
   currentChat = user;
   currentChatType = 'pv';
   currentGroupId = null;
@@ -446,7 +454,7 @@ function openPV(user) {
 }
 
 function openGroup(id, name, link) {
-  if (isCallActive) endCallUI();
+  if (isCallActive) leaveAgoraCall();
   currentChat = id;
   currentChatType = 'group';
   currentGroupId = id;
@@ -455,7 +463,6 @@ function openGroup(id, name, link) {
   chatSubtitle.textContent = link || '';
   messagesDiv.innerHTML = '';
   
-  // نمایش دکمه‌های تماس
   callActions.style.display = 'flex';
   startCallBtn.style.display = 'flex';
   joinCallBtn.style.display = 'none';
@@ -470,45 +477,131 @@ function openGroup(id, name, link) {
 }
 
 // ============================================================
-// ===================== CALL FUNCTIONS ========================
+// ===================== AGORA CALL FUNCTIONS ==================
 // ============================================================
 
-function showCallUI(roomUrl) {
-  callContainer.style.display = 'block';
-  
-  callFrame = Daily.createFrame(callContainer, {
-    showLeaveButton: true,
-    showFullscreenButton: true,
-    iframeStyle: {
-      width: '100%',
-      height: '100%',
-      border: 'none'
+async function joinAgoraCall(appId, channel, token, uid) {
+  try {
+    client = AgoraRTC.createClient({ 
+      mode: "rtc", 
+      codec: "vp8",
+      role: "host"
+    });
+    
+    client.on("user-published", async (user, mediaType) => {
+      await client.subscribe(user, mediaType);
+      
+      if (mediaType === "video") {
+        const playerDiv = document.createElement('div');
+        playerDiv.id = `remote-${user.uid}`;
+        playerDiv.style.width = '300px';
+        playerDiv.style.height = '200px';
+        playerDiv.style.background = '#1a2a3a';
+        playerDiv.style.borderRadius = '12px';
+        playerDiv.style.overflow = 'hidden';
+        playerDiv.style.border = '2px solid rgba(79,172,254,0.2)';
+        remoteVideoContainer.appendChild(playerDiv);
+        
+        user.videoTrack.play(playerDiv);
+      }
+      
+      if (mediaType === "audio") {
+        user.audioTrack.play();
+      }
+    });
+    
+    client.on("user-unpublished", (user, mediaType) => {
+      if (mediaType === "video") {
+        const playerDiv = document.getElementById(`remote-${user.uid}`);
+        if (playerDiv) {
+          playerDiv.remove();
+        }
+      }
+    });
+    
+    client.on("user-left", (user) => {
+      const playerDiv = document.getElementById(`remote-${user.uid}`);
+      if (playerDiv) {
+        playerDiv.remove();
+      }
+      delete remoteUsers[user.uid];
+    });
+    
+    await client.join(appId, channel, token, uid);
+    
+    const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+    const videoTrack = await AgoraRTC.createCameraVideoTrack();
+    
+    localAudioTrack = audioTrack;
+    localVideoTrack = videoTrack;
+    
+    videoTrack.play(localVideoContainer);
+    
+    await client.publish([audioTrack, videoTrack]);
+    
+    isCallActive = true;
+    showCallUI();
+    
+  } catch (error) {
+    console.error('Error joining call:', error);
+    showNotif('Failed to join call: ' + error.message, 'fa-exclamation-circle');
+  }
+}
+
+function leaveAgoraCall() {
+  if (client) {
+    if (localAudioTrack) {
+      localAudioTrack.close();
+      localAudioTrack = null;
     }
-  });
+    if (localVideoTrack) {
+      localVideoTrack.close();
+      localVideoTrack = null;
+    }
+    client.leave();
+    client = null;
+  }
   
-  callFrame.join({ url: roomUrl });
-  isCallActive = true;
+  remoteVideoContainer.innerHTML = '';
+  localVideoContainer.innerHTML = '';
   
+  isCallActive = false;
+  hideCallUI();
+}
+
+function toggleMute() {
+  if (localAudioTrack) {
+    const muted = localAudioTrack.muted;
+    localAudioTrack.setMuted(!muted);
+    muteBtn.innerHTML = muted ? '<i class="fas fa-microphone"></i>' : '<i class="fas fa-microphone-slash"></i>';
+  }
+}
+
+function toggleVideo() {
+  if (localVideoTrack) {
+    const enabled = localVideoTrack.enabled;
+    localVideoTrack.setEnabled(!enabled);
+    videoBtn.innerHTML = enabled ? '<i class="fas fa-video"></i>' : '<i class="fas fa-video-slash"></i>';
+  }
+}
+
+function showCallUI() {
+  callContainer.style.display = 'flex';
   startCallBtn.style.display = 'none';
   joinCallBtn.style.display = 'none';
   endCallBtn.style.display = 'flex';
 }
 
-function endCallUI() {
-  if (callFrame) {
-    callFrame.leave();
-    callFrame.destroy();
-    callFrame = null;
-  }
+function hideCallUI() {
   callContainer.style.display = 'none';
-  isCallActive = false;
-  currentCallRoomUrl = null;
-  
   endCallBtn.style.display = 'none';
   startCallBtn.style.display = 'flex';
 }
 
-// ===== CALL BUTTON EVENTS =====
+// ============================================================
+// ===================== CALL BUTTON EVENTS ====================
+// ============================================================
+
 startCallBtn.onclick = () => {
   if (!currentGroupId) {
     showNotif('Please select a group first', 'fa-exclamation-circle');
@@ -518,17 +611,32 @@ startCallBtn.onclick = () => {
 };
 
 endCallBtn.onclick = () => {
+  leaveAgoraCall();
   if (currentGroupId) {
     socket.emit('end-group-call', { groupId: currentGroupId });
   }
-  endCallUI();
+};
+
+endCallBtnAgora.onclick = () => {
+  leaveAgoraCall();
+  if (currentGroupId) {
+    socket.emit('end-group-call', { groupId: currentGroupId });
+  }
 };
 
 joinCallBtn.onclick = () => {
-  if (currentCallRoomUrl) {
-    showCallUI(currentCallRoomUrl);
+  if (currentCallRoomData) {
+    joinAgoraCall(
+      currentCallRoomData.appId,
+      currentCallRoomData.channel,
+      currentCallRoomData.token,
+      currentCallRoomData.uid
+    );
   }
 };
+
+muteBtn.onclick = toggleMute;
+videoBtn.onclick = toggleVideo;
 
 // ============================================================
 // ===================== REPLY =================================
@@ -737,10 +845,10 @@ function appendMessage(msg) {
   const avatarWrap = document.createElement('div');
   avatarWrap.className = 'avatar-wrap';
   avatarWrap.dataset.user = msg.sender;
-  const avatarImg = document.createElement('img');
-  avatarImg.src = msg.sender_avatar || '';
-  avatarImg.onerror = () => { avatarImg.style.display = 'none'; };
-  avatarWrap.appendChild(avatarImg);
+  const avatarImgEl = document.createElement('img');
+  avatarImgEl.src = msg.sender_avatar || '';
+  avatarImgEl.onerror = () => { avatarImgEl.style.display = 'none'; };
+  avatarWrap.appendChild(avatarImgEl);
   div.appendChild(avatarWrap);
   
   const content = document.createElement('div');
@@ -754,12 +862,15 @@ function appendMessage(msg) {
     content.appendChild(nameSpan);
   }
   
+  // ===== ریپلای درست =====
   if (msg.reply_to) {
     const replyPreview = document.createElement('div');
     replyPreview.className = 'reply-preview';
+    const replyText = msg.reply_text || 'Deleted message';
+    const replySender = msg.reply_sender_display || msg.reply_sender || 'Unknown';
     replyPreview.innerHTML = `
       <i class="fas fa-reply"></i>
-      <span><strong>${msg.reply_sender_display || msg.reply_sender}</strong>: ${msg.reply_text || 'Deleted message'}</span>
+      <span><strong>${replySender}</strong>: ${replyText}</span>
     `;
     content.appendChild(replyPreview);
   }
@@ -889,6 +1000,7 @@ socket.on('my-groups', (groups) => {
   groups.forEach(g => addGroupToList(g.id, g.name, `Shisheiha://${g.link_id}`));
 });
 
+// ===== RECEIVE MESSAGE (با ریپلای کامل) =====
 socket.on('receive-message', (msg) => {
   if (currentChatType === 'pv' && (msg.sender === currentChat || msg.receiver === currentChat)) {
     appendMessage(msg);
@@ -995,17 +1107,17 @@ socket.on('user-disconnected', (username) => {
 
 // ===== CALL SOCKET EVENTS =====
 socket.on('group-call-started', (data) => {
-  currentCallRoomUrl = data.roomUrl;
+  currentCallRoomData = data;
   if (data.startedBy !== currentUser) {
     joinCallBtn.style.display = 'flex';
     showNotif(`🔔 ${data.startedBy} started a group call!`, 'fa-phone');
   } else {
-    showCallUI(data.roomUrl);
+    joinAgoraCall(data.appId, data.channel, data.token, data.uid);
   }
 });
 
 socket.on('group-call-ended', () => {
-  endCallUI();
+  leaveAgoraCall();
   showNotif('📴 Call ended', 'fa-phone-slash');
 });
 
@@ -1025,4 +1137,4 @@ socket.on('error', (err) => {
   }
 })();
 
-console.log('🚀 Shisheiha v4.1 ready!');
+console.log('🚀 Shisheiha v4.1 with Agora ready!');
