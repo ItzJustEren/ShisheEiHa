@@ -112,7 +112,7 @@
       </div>
     </div>
     
-    <!-- ===== CALL ACTIONS (جدید) ===== -->
+    <!-- Call Actions -->
     <div id="callActions" style="display:none; padding: 8px 20px; background: rgba(79,172,254,0.08); border-bottom: 1px solid rgba(79,172,254,0.1); gap: 8px; align-items: center;">
       <button id="startCallBtn" class="action-btn" style="display:none;">
         <i class="fas fa-phone"></i> Start Call
@@ -136,8 +136,16 @@
   </div>
 </div>
 
-<!-- ===== CALL CONTAINER (Daily.co) ===== -->
-<div id="callContainer" style="display:none; position:fixed; inset:0; z-index:10000; background:#0f1a2c;"></div>
+<!-- ===== CALL CONTAINER (Agora) ===== -->
+<div id="callContainer" style="display:none; position:fixed; inset:0; z-index:10000; background:#0a1520; flex-direction:column;">
+  <div id="remoteVideoContainer" style="flex:1; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px; padding:10px; background:#0a1520;"></div>
+  <div id="localVideoContainer" style="width:180px; height:120px; position:absolute; bottom:100px; right:20px; border:2px solid rgba(79,172,254,0.3); border-radius:12px; overflow:hidden; background:#1a2a3a;"></div>
+  <div id="callControls" style="position:absolute; bottom:30px; left:50%; transform:translateX(-50%); display:flex; gap:20px; z-index:10001;">
+    <button id="muteBtn" class="call-control-btn" style="background:rgba(255,255,255,0.1); border:none; border-radius:50%; width:50px; height:50px; color:#fff; font-size:20px; cursor:pointer;"><i class="fas fa-microphone"></i></button>
+    <button id="videoBtn" class="call-control-btn" style="background:rgba(255,255,255,0.1); border:none; border-radius:50%; width:50px; height:50px; color:#fff; font-size:20px; cursor:pointer;"><i class="fas fa-video"></i></button>
+    <button id="endCallBtnAgora" class="call-control-btn" style="background:#ff6b6b; border:none; border-radius:50%; width:50px; height:50px; color:#fff; font-size:20px; cursor:pointer;"><i class="fas fa-phone-slash"></i></button>
+  </div>
+</div>
 
 <!-- ===== MODALS ===== -->
 <!-- Profile Modal -->
@@ -214,7 +222,7 @@
 </div>
 
 <!-- Scripts -->
-<script src="https://unpkg.com/@daily-co/daily-js@0.51.0/daily-js.min.js"></script>
+<script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.23.0.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script src="script.js"></script>
 </body>
